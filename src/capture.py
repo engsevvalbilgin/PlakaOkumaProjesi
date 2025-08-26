@@ -50,15 +50,18 @@ plate_detector = Detector(model_path)
 
 # Kamera kaynağını başlat
 webcam = cv2.VideoCapture(0)
+# Modeli ve Detector sınıfını sadece bir kez oluşturun
+model_path = "C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\runs\\plate_detection\\weights\\best.pt"
+plate_detector = Detector(model_path)
 
 while True:
     ret, frame = webcam.read()
+    frame = cv2.resize(frame, (640, 480))
     if not ret:
         break
 
     # Detector sınıfını kullanarak kareyi işle ve sonuçları al
-    detector=Detector(model_path="C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\runs\\plate_detection\\weights\\best.pt")
-    processed_frame = detector.detect_and_draw(frame)
+    processed_frame = plate_detector.detect_and_draw(frame)
 
     # İşlenmiş kareyi göster
     cv2.imshow("Plaka Tespiti", processed_frame)
