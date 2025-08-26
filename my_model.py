@@ -32,7 +32,7 @@ for i, f in enumerate(files):
 model = YOLO("yolov8n.pt")  # küçük model, hızlı
 model.train(
     data="C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\plaka_data.yaml",
-    epochs=1,
+    epochs=100,
     imgsz=640,
     batch=16,
     name="plate_detection",
