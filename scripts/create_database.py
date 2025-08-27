@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime, timedelta
 import os
 # Bağlantı
-conn = sqlite3.connect("vehicles.db")
+conn = sqlite3.connect("C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\data\\vehicles.db")
 cursor = conn.cursor()
 # Tablo oluştur
 cursor.execute("""
