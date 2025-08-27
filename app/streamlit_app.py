@@ -1,37 +1,84 @@
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
+import sqlite3
+import os
+
+# Veritabanı adı
+DB_NAME = 'vehicles.db'
 
 
-# Örnek veri oluşturucu / Sample data generator
-def generate_sample_data_df():
-    """Örnek araç kayıtlarını içeren bir pandas DataFrame döndürür."""
-    """Returns a pandas DataFrame with sample vehicle records."""
-    now = datetime.now()
-    data = [
-        {"plate": "34ABC01", "model": "Renault Clio", "entry_time": (now - timedelta(hours=1, minutes=23)),
-         "exit_time": None},
-        {"plate": "06XYZ99", "model": "Toyota Corolla", "entry_time": (now - timedelta(days=1, hours=2)),
-         "exit_time": (now - timedelta(days=1, hours=1))},
-        {"plate": "35QWE12", "model": "Fiat Egea", "entry_time": (now - timedelta(hours=6)), "exit_time": None},
-        {"plate": "07RST45", "model": "Volkswagen Passat", "entry_time": (now - timedelta(days=3, hours=4)),
-         "exit_time": (now - timedelta(days=2, hours=20))},
-        {"plate": "16ABC02", "model": "Ford Focus", "entry_time": (now - timedelta(hours=10)), "exit_time": None},
-        {"plate": "42XYZ03", "model": "Opel Astra", "entry_time": (now - timedelta(days=0, minutes=45)), "exit_time": None},
-    ]
-    df = pd.DataFrame(data)
-    # Hesaplamalar için zamanların datetime formatında olduğundan emin olun
-    # Ensure times are in datetime format for calculations
-    df['entry_time'] = pd.to_datetime(df['entry_time'])
-    df['exit_time'] = pd.to_datetime(df['exit_time'])
-    return df
+# Veritabanından veri çekme fonksiyonu
+# Function to fetch data from the database
+def get_vehicles_data_from_db():
+    """Veritabanına bağlanır, verileri çeker ve DataFrame olarak döndürür."""
+    """Connects to the database, fetches data, and returns it as a DataFrame."""
+    conn = None
+    try:
+        # Veritabanı dosyasının varlığını kontrol et
+        # Check if the database file exists
+        db_exists = os.path.exists(DB_NAME)
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+
+        # vehicles tablosunu oluştur (eğer yoksa)
+        # Create the vehicles table (if it doesn't exist)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS vehicles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                plate TEXT NOT NULL,
+                model TEXT,
+                entry_time TEXT,
+                exit_time TEXT
+            )
+        ''')
+        conn.commit()
+
+        # Tabloya örnek veri ekle (sadece ilk çalıştırmada)
+        # Add sample data to the table (only on the first run)
+        if not db_exists:
+            now = datetime.now()
+            sample_data = [
+                ("34ABC01", "Renault Clio", now - timedelta(hours=1, minutes=23), None),
+                ("06XYZ99", "Toyota Corolla", now - timedelta(days=1, hours=2), now - timedelta(days=1, hours=1)),
+                ("35QWE12", "Fiat Egea", now - timedelta(hours=6), None),
+                ("07RST45", "Volkswagen Passat", now - timedelta(days=3, hours=4), now - timedelta(days=2, hours=20)),
+                ("16ABC02", "Ford Focus", now - timedelta(hours=10), None),
+                ("42XYZ03", "Opel Astra", now - timedelta(minutes=45), None),
+            ]
+
+            cursor.executemany("INSERT INTO vehicles (plate, model, entry_time, exit_time) VALUES (?, ?, ?, ?)",
+                               sample_data)
+            conn.commit()
+            print("Örnek veriler veritabanına eklendi.")
+            print("Sample data added to the database.")
+
+        # Tüm veriyi çek ve DataFrame olarak oku
+        # Fetch all data and read as a DataFrame
+        df = pd.read_sql_query("SELECT * FROM vehicles", conn)
+
+        # Zaman sütunlarını datetime formatına çevir
+        # Convert time columns to datetime format
+        df['entry_time'] = pd.to_datetime(df['entry_time'])
+        df['exit_time'] = pd.to_datetime(df['exit_time'])
+
+        return df
+
+    except sqlite3.Error as e:
+        st.error(f"Veritabanı hatası: {e}")
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
 
 
 # Ana Streamlit uygulama fonksiyonu / Main Streamlit app function
 def run_streamlit_app():
     """Etkileşimli Streamlit tabanlı kullanıcı arayüzünü çalıştırır."""
     """Runs the interactive Streamlit-based UI."""
-    df = generate_sample_data_df()
+
+    # Veriyi veritabanından yükle / Load data from the database
+    df = get_vehicles_data_from_db()
 
     # Tarihleri biçimlendirmek için yardımcı fonksiyon / Helper function for formatting dates
     def fmt(dt):
@@ -71,7 +118,7 @@ def run_streamlit_app():
         filtered = filtered[
             (filtered["entry_time"].dt.date >= start_date) &
             (filtered["entry_time"].dt.date <= end_date)
-        ]
+            ]
     elif start_date:
         filtered = filtered[filtered["entry_time"].dt.date == start_date]
 

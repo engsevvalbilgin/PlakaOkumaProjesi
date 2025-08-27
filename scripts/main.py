@@ -1,3 +1,6 @@
+import src.capture
+
+'''
 from ultralytics import YOLO
 import cv2
 import pandas as pd
@@ -86,3 +89,4 @@ plt.axis("off")
 #metrics = model.val(data='C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\plaka_data.yaml')
 #plaka bulmada (Recall: %98.2),
 #yanlış yerleri plaka olarak işaretlememe (Precision: %99.4)
+'''

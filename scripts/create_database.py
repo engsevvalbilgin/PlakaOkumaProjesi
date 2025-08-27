@@ -1,17 +1,16 @@
 import sqlite3
 from datetime import datetime, timedelta
-
+import os
 # Bağlantı
-conn = sqlite3.connect("../data/database.db")
+conn = sqlite3.connect("vehicles.db")
 cursor = conn.cursor()
-
 # Tablo oluştur
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS vehicles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     plate TEXT NOT NULL,
     model TEXT,
-    entry_time DATETIME NOT NULL,
+    entry_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     exit_time DATETIME
 )
 """)
@@ -19,7 +18,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
 # Şimdi örnek veriler ekleyelim
 now = datetime.now()
 
-sample_data = [
+'''sample_data = [
     ("34ABC01", "Renault Clio", now - timedelta(hours=1, minutes=30), None),
     ("06XYZ99", "Toyota Corolla", now - timedelta(days=1, hours=5), now - timedelta(days=1, hours=3)),
     ("35QWE12", "Fiat Egea", now - timedelta(hours=6), None),
@@ -29,6 +28,6 @@ sample_data = [
 ]
 
 cursor.executemany("INSERT INTO vehicles (plate, model, entry_time, exit_time) VALUES (?, ?, ?, ?)", sample_data)
-
+'''
 conn.commit()
 conn.close()
