@@ -1,39 +1,38 @@
 import cv2
-from detector import Detector
 import os
 from dotenv import load_dotenv
+from src.detector import Detector
+from src.plate_database import PlateDatabase
 
-# .env dosyasını yükle
 load_dotenv()
-# PlateDetector sınıfının bir örneğini oluştur
-# YOLO modelinizin yolunu buraya ekleyin
-import detector
-
-plate_detector = Detector(os.environ['model_path'])
-
-# Kamera kaynağını başlat
-webcam = cv2.VideoCapture(0)
-# Modeli ve Detector sınıfını sadece bir kez oluşturun
 
 
-while True:
-    ret, frame = webcam.read()
-    frame = cv2.resize(frame, (640, 480))
-    if not ret:
-        break
+def start_capture():
+    """Kameradan görüntü yakalar, plaka tespit eder ve DB'ye kaydeder."""
+    db_path = os.path.join(os.environ['data_path'], 'vehicles.db')
+    plate_db = PlateDatabase(db_path)
 
-    # Detector sınıfını kullanarak kareyi işle ve sonuçları al
-    processed_frame = plate_detector.detect_and_draw(frame)
+    model_path = os.environ['model_path']
+    plate_detector = Detector(model_path)
 
-    # İşlenmiş kareyi göster
-    cv2.imshow("Plaka Tespiti", processed_frame)
-    key =cv2.waitKey(1)
-    # 'q' tuşuna basıldığında döngüden çık
-    if  key == ord('q'):
-        webcam.release()
-        break
+    webcam = cv2.VideoCapture(0)
 
-# Kaynakları serbest bırak ve pencereleri kapat
+    while True:
+        ret, frame = webcam.read()
+        if not ret:
+            break
 
-cv2.destroyAllWindows()
+        processed_frame, plates = plate_detector.detect_plate(frame)
 
+        if plates:
+            for plate in plates:
+                plate_db.record_plate_event(plate)
+
+        cv2.imshow("Plaka Tespiti", processed_frame)
+
+        key = cv2.waitKey(1)
+        if key == ord('q'):  # q ile çıkış
+            break
+
+    webcam.release()
+    cv2.destroyAllWindows()
