@@ -3,22 +3,20 @@ import streamlit as st
 from datetime import datetime, timedelta
 import sqlite3
 import os
-
-# Veritabanı adı
-DB_NAME = 'vehicles.db'
-
-
-# Veritabanından veri çekme fonksiyonu
-# Function to fetch data from the database
+from dotenv import load_dotenv
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "../src"))
+from plate_database import PlateDatabase
+import cv2
+import time
+load_dotenv()
 def get_vehicles_data_from_db():
-    """Veritabanına bağlanır, verileri çeker ve DataFrame olarak döndürür."""
-    """Connects to the database, fetches data, and returns it as a DataFrame."""
     conn = None
     try:
         # Veritabanı dosyasının varlığını kontrol et
         # Check if the database file exists
-        db_exists = os.path.exists(DB_NAME)
-        conn = sqlite3.connect(DB_NAME)
+        db_exists = os.path.exists(os.environ['DB_NAME'])
+        conn = sqlite3.connect(os.environ['DB_NAME'])
         cursor = conn.cursor()
 
         # vehicles tablosunu oluştur (eğer yoksa)
@@ -28,30 +26,17 @@ def get_vehicles_data_from_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 plate TEXT NOT NULL,
                 model TEXT,
-                entry_time TEXT,
-                exit_time TEXT
+                entry_time DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                exit_time TIMESTAMP
             )
         ''')
         conn.commit()
 
         # Tabloya örnek veri ekle (sadece ilk çalıştırmada)
         # Add sample data to the table (only on the first run)
-        if not db_exists:
-            now = datetime.now()
-            sample_data = [
-                ("34ABC01", "Renault Clio", now - timedelta(hours=1, minutes=23), None),
-                ("06XYZ99", "Toyota Corolla", now - timedelta(days=1, hours=2), now - timedelta(days=1, hours=1)),
-                ("35QWE12", "Fiat Egea", now - timedelta(hours=6), None),
-                ("07RST45", "Volkswagen Passat", now - timedelta(days=3, hours=4), now - timedelta(days=2, hours=20)),
-                ("16ABC02", "Ford Focus", now - timedelta(hours=10), None),
-                ("42XYZ03", "Opel Astra", now - timedelta(minutes=45), None),
-            ]
 
-            cursor.executemany("INSERT INTO vehicles (plate, model, entry_time, exit_time) VALUES (?, ?, ?, ?)",
-                               sample_data)
-            conn.commit()
-            print("Örnek veriler veritabanına eklendi.")
-            print("Sample data added to the database.")
+
+
 
         # Tüm veriyi çek ve DataFrame olarak oku
         # Fetch all data and read as a DataFrame
@@ -59,9 +44,11 @@ def get_vehicles_data_from_db():
 
         # Zaman sütunlarını datetime formatına çevir
         # Convert time columns to datetime format
-        df['entry_time'] = pd.to_datetime(df['entry_time'])
-        df['exit_time'] = pd.to_datetime(df['exit_time'])
-
+        df['entry_time'] = pd.to_datetime(df['entry_time'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
+        df['exit_time'] = pd.to_datetime(df['exit_time'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
+        # string formatına çevir
+        df['entry_time_str'] = df['entry_time'].dt.strftime('%Y-%m-%d %H:%M')
+        df['exit_time_str'] = df['exit_time'].dt.strftime('%Y-%m-%d %H:%M')
         return df
 
     except sqlite3.Error as e:
@@ -74,9 +61,6 @@ def get_vehicles_data_from_db():
 
 # Ana Streamlit uygulama fonksiyonu / Main Streamlit app function
 def run_streamlit_app():
-    """Etkileşimli Streamlit tabanlı kullanıcı arayüzünü çalıştırır."""
-    """Runs the interactive Streamlit-based UI."""
-
     # Veriyi veritabanından yükle / Load data from the database
     df = get_vehicles_data_from_db()
 
@@ -99,11 +83,12 @@ def run_streamlit_app():
     min_date = (datetime.now() - timedelta(days=30)).date()
     date_range = st.sidebar.date_input("Gün seç (veya aralık)", value=(min_date, datetime.now().date()))
 
-    if isinstance(date_range, (tuple, list)):
+    # Eğer tek tarih seçildiyse tuple yap
+
+    if isinstance(date_range, (tuple, list))and len(date_range) == 2:
         start_date, end_date = date_range[0], date_range[1]
     else:
-        start_date = date_range
-        end_date = date_range
+        start_date = end_date = date_range
 
     plate_search = st.sidebar.text_input("Plaka ara (opsiyonel)")
 
@@ -115,13 +100,26 @@ def run_streamlit_app():
     # Tarih aralığı filtresini uygula
     # Apply the date range filter
     if start_date and end_date:
-        filtered = filtered[
-            (filtered["entry_time"].dt.date >= start_date) &
-            (filtered["entry_time"].dt.date <= end_date)
-            ]
+        # start_date ve end_date'i datetime64[ns] yap
+        start_datetime = pd.to_datetime(start_date)
+        end_datetime = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        try:
+            filtered = filtered[
+                (filtered["entry_time"] >= start_datetime) &
+                (filtered["entry_time"] <= end_datetime)
+                ]
+        except:
+            pass
     elif start_date:
-        filtered = filtered[filtered["entry_time"].dt.date == start_date]
-
+        start_datetime = pd.to_datetime(start_date)
+        end_datetime = start_datetime + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        try:
+            filtered = filtered[
+                (filtered["entry_time"] >= start_datetime) &
+                (filtered["entry_time"] <= end_datetime)
+                ]
+        except:
+            pass
     if plate_search:
         filtered = filtered[filtered["plate"].str.contains(plate_search, case=False, na=False)]
 
@@ -162,12 +160,34 @@ def run_streamlit_app():
                             duration = now - entry
                             st.write(f"İçerde geçen süre: **{str(duration).split('.')[0]}**")
 
-                        btn_key = f"detay_{idx}_{plate}"
-                        # Kullanıcı butona bastığında, oturum durumunu güncelle ve detayları göster
-                        # When the user clicks the button, update the session state and show details
-                        if st.button("Detayları Göster", key=btn_key):
+                        btn_key_detay = f"detay_{idx}_{plate}"
+                        btn_key_duzenle = f"duzenle_{idx}_{plate}"
+
+                        # Detayları göster
+                        if st.button("Detayları Göster", key=btn_key_detay):
                             st.session_state["selected_plate"] = plate
-                st.markdown("---")
+
+                        # Modeli düzenleme butonu
+                        # Modeli düzenleme butonu
+                        if st.button("Düzenle", key=btn_key_duzenle):
+                            # Kullanıcıdan yeni model bilgisini al
+
+                            new_model = st.text_input(f"{plate} için yeni model girin:", value=model,
+                                                      key=f"input_model_{idx}_{plate}")
+                            new_plate = st.text_input(f"{plate} için yeni plaka girin:", value=plate,
+                                                      key=f"input_plate_{idx}_{plate}")
+
+                            if st.button("Kaydet", key=f"save_{idx}_{plate}"):
+                                old_plate = plate.strip().upper()
+                                new_plate_clean = new_plate.strip().upper()
+                                new_model_clean = new_model.strip()
+
+                                if old_plate != new_plate_clean:
+                                    PlateDatabase.update_plate(old_plate, new_plate_clean)
+                                    st.success(f"{old_plate} → {new_plate_clean} güncellendi!")
+
+                                PlateDatabase.update_model(new_plate_clean, new_model_clean)
+                                st.success(f"{new_plate_clean} için model güncellendi!")
 
     with right_col:
         st.markdown("### Seçilen Araç Detayları")
@@ -175,33 +195,66 @@ def run_streamlit_app():
         if selected_plate is None:
             st.write("Listeden bir araç seçmek için 'Detayları Göster' butonuna basın. 👈")
         else:
-            selected_row_data = df[df["plate"] == selected_plate].iloc[0]
-            st.markdown(f"#### {selected_row_data['plate']} — {selected_row_data['model']}")
-            st.write(f"**Giriş:** {fmt(selected_row_data['entry_time'])}")
-            st.write(f"**Çıkış:** {fmt(selected_row_data['exit_time'])}")
+            # Seçilen aracın tüm kayıtlarını al
+            plate_history = df[df["plate"] == selected_plate].sort_values(by="entry_time", ascending=False)
+            # Son kayıt detayları
+            latest = plate_history.iloc[0]
 
-            if pd.notnull(selected_row_data['exit_time']):
-                total = selected_row_data['exit_time'] - selected_row_data['entry_time']
+            st.markdown(f"#### {latest['plate']} — {latest['model']}")
+            st.write(f"**Giriş:** {fmt(latest['entry_time'])}")
+            st.write(f"**Çıkış:** {fmt(latest['exit_time'])}")
+
+            if pd.notnull(latest['exit_time']):
+                total = latest['exit_time'] - latest['entry_time']
                 st.write(f"**Toplam kalış:** {str(total).split('.')[0]}")
             else:
                 now = datetime.now()
-                elapsed = now - selected_row_data['entry_time']
+                elapsed = now - latest['entry_time']
                 st.write(f"**İçerde geçen süre:** {str(elapsed).split('.')[0]}")
+                # Araç içerideyse Çıkış Ver butonu
+                if st.button("Çıkış Ver", key=f"exit_{idx}_{plate}"):
+                    # Veritabanını aç
+                    db_path = os.environ.get('DB_NAME', 'vehicles.db')
+                    db = PlateDatabase(db_path)
+                    db.set_exit_time(selected_plate)  # artık self doğru şekilde geliyor
+                    st.success(f"{selected_plate} için çıkış verildi!")
 
             st.markdown("---")
-            st.markdown("<h5 style='color: #333;'>Geçmiş Kayıtlar (örnek)</h5>", unsafe_allow_html=True)
-            hist = pd.DataFrame([
-                {"action": "Giriş", "time": selected_row_data['entry_time'] - timedelta(days=10)},
-                {"action": "Çıkış", "time": selected_row_data['entry_time'] - timedelta(days=10) + timedelta(hours=2)},
-                {"action": "Giriş", "time": selected_row_data['entry_time']},
-            ])
-            st.dataframe(hist.assign(time=lambda d: d['time'].dt.strftime('%Y-%m-%d %H:%M:%S')), hide_index=True)
 
+            st.markdown(f"#### Tüm Geçmiş Kayıtlar")
+            display_df = plate_history[['entry_time_str', 'exit_time_str']].rename(
+                columns={'entry_time_str': 'Giriş Zamanı', 'exit_time_str': 'Çıkış Zamanı'}
+            )
+            st.table(display_df)
+
+
+
+#CSV indirme butonu
     # CSV indirme butonu
     st.sidebar.markdown("---")
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button("Veriyi CSV olarak indir", data=csv, file_name="parking_data.csv", mime="text/csv")
-    st.caption("Not: Bu demo, kameradan plaka okuma entegrasyonu içermez. Verinizi gerçek bir kaynaktan alabilirsiniz.")
+
+    # Hangi veriyi indirmek istediğimizi belirle
+    if mode == "Tüm Geçmiş":
+        csv_df = df.copy()  # tüm geçmişi al
+    elif mode == "İçerdeki Araçlar":
+        csv_df = df[df["exit_time"].isnull()]  # içerideki araçlar
+    else:
+        csv_df = filtered.copy()  # filtre varsa filtrelenmiş veriyi al
+
+    # Tarih ve plaka filtrelerini uygula
+    if start_date and end_date:
+        start_datetime = pd.to_datetime(start_date)
+        end_datetime = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        csv_df = csv_df[
+            (csv_df["entry_time"] >= start_datetime) &
+            (csv_df["entry_time"] <= end_datetime)
+            ]
+    if plate_search:
+        csv_df = csv_df[csv_df["plate"].str.contains(plate_search, case=False, na=False)]
+
+    # CSV olarak indir
+    csv = csv_df.to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button("Veriyi CSV olarak indir", data=csv, file_name="vehicles.csv", mime="text/csv")
 
 
 # Uygulamayı çalıştır / Run the app
