@@ -135,7 +135,6 @@ class PlateDatabase:
         self.conn.close()
 '''
 
-# Veritabanından araç verilerini çeken fonksiyon
     def get_vehicles_data_from_db(self):
         conn = None
         try:

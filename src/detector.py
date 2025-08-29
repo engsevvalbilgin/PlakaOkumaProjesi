@@ -25,7 +25,6 @@ class Detector:
                 plate_text = self.plate_reader.read_plate(frame, (x1, y1, w, h))
                 if plate_text:
                     plates_found.append(plate_text)
-                # Tespit edilen plakayı çiz
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(frame, plate_text, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)

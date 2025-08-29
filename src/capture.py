@@ -8,7 +8,7 @@ load_dotenv()
 
 
 def start_capture():
-    """Kameradan görüntü yakalar, plaka tespit eder ve DB'ye kaydeder."""
+
     db_path = os.path.join(os.environ['data_path'], 'vehicles.db')
     plate_db = PlateDatabase(db_path)
 
