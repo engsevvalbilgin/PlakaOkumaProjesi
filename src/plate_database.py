@@ -32,8 +32,9 @@ class PlateDatabase:
         """)
         self.conn.commit()
 
-    def encrypt_plate(self, plate: str) -> str:
-        return cipher.encrypt(plate.encode()).decode()
+    def encrypt_plate(self, plate: str) :
+        encrypted_data = cipher.encrypt(plate.encode()).decode()
+        return encrypted_data
 
     def decrypt_plate(self, encrypted_plate: str) -> str:
         try:
@@ -80,16 +81,43 @@ class PlateDatabase:
             "INSERT INTO vehicles (plate, entry_time) VALUES (?, ?)",
             (encrypted_plate, now)
         )
+
+        self.conn.commit()
+
+    def set_exit_time_by_id(self, vehicle_id: int):
+        print(vehicle_id)
+        vehicle_id = int(vehicle_id)
+        now = datetime.now()
+        self.cursor.execute("SELECT id, plate, exit_time FROM vehicles WHERE id=?", (vehicle_id,))
+        rows = self.cursor.fetchall()
+        print("Veritabanında bu ID ile kayıt:", rows)
+        self.cursor.execute(
+            "UPDATE vehicles SET exit_time = ? WHERE id = ?",
+            (now, vehicle_id)
+        )
+        print("Güncellenen satır sayısı:", self.cursor.rowcount)
         self.conn.commit()
 
     def set_exit_time(self, plate: str):
+        print(plate)
         encrypted_plate = self.encrypt_plate(plate)
+        print(encrypted_plate)
         now = datetime.now()
         self.cursor.execute(
             "UPDATE vehicles SET exit_time = ? WHERE plate = ? AND exit_time IS NULL",
             (now, encrypted_plate)
         )
+        print(self.cursor.rowcount)
         self.conn.commit()
+
+    '''
+    def set_exit_time_by_id(self, vehicle_id: int):
+    now = datetime.now()
+    self.cursor.execute(
+        "UPDATE vehicles SET exit_time = ? WHERE id = ? AND exit_time IS NULL",
+        (now, vehicle_id)
+    )
+    self.conn.commit()
 
     def update_data_by_id(self, vehicle_id, new_plate, new_model):
         encrypted_plate = self.encrypt_plate(new_plate.strip().upper())
@@ -105,27 +133,55 @@ class PlateDatabase:
 
     def __del__(self):
         self.conn.close()
-
+'''
 
 # Veritabanından araç verilerini çeken fonksiyon
-def get_vehicles_data_from_db():
-    try:
-        db_path = os.environ.get('DB_NAME', 'vehicles.db')
-        db = PlateDatabase(db_path)
+    def get_vehicles_data_from_db(self):
+        conn = None
+        try:
+            db_exists = os.path.exists(os.environ['DB_NAME'])
+            conn = sqlite3.connect(os.environ['DB_NAME'])
+            cursor = conn.cursor()
 
-        df = pd.read_sql_query("SELECT * FROM vehicles", db.conn)
+            # Tabloyu oluştur
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS vehicles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    plate TEXT NOT NULL,
+                    model TEXT,
+                    entry_time DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    exit_time TIMESTAMP
+                )
+            ''')
+            conn.commit()
 
-        # Plakaları deşifrele
-        df['plate'] = df['plate'].apply(db.decrypt_plate)
+            # Veriyi çek
+            df = pd.read_sql_query("SELECT * FROM vehicles", conn)
 
-        # Zaman sütunları
-        df['entry_time'] = pd.to_datetime(df['entry_time'], errors='coerce')
-        df['exit_time'] = pd.to_datetime(df['exit_time'], errors='coerce')
+            # Plakaları deşifrele
+            def decrypt_plate(encrypted_plate):
+                try:
+                    # Eğer veri bytes değilse str'e encode et
+                    if isinstance(encrypted_plate, str):
+                        encrypted_plate = encrypted_plate.encode()
+                    return cipher.decrypt(encrypted_plate).decode()
+                except Exception:
+                    return encrypted_plate.decode() if isinstance(encrypted_plate, bytes) else encrypted_plate
 
-        df['entry_time_str'] = df['entry_time'].dt.strftime('%Y-%m-%d %H:%M')
-        df['exit_time_str'] = df['exit_time'].dt.strftime('%Y-%m-%d %H:%M')
-        return df
+            df['plate'] = df['plate'].apply(decrypt_plate)
 
-    except Exception as e:
-        st.error(f"Veritabanı hatası: {e}")
-        return pd.DataFrame()
+            # Zaman sütunları
+            df['entry_time'] = pd.to_datetime(df['entry_time'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
+            df['exit_time'] = pd.to_datetime(df['exit_time'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
+
+            df['entry_time_str'] = df['entry_time'].dt.strftime('%Y-%m-%d %H:%M')
+            df['exit_time_str'] = df['exit_time'].dt.strftime('%Y-%m-%d %H:%M')
+
+            return df
+
+        except sqlite3.Error as e:
+            st.error(f"Veritabanı hatası: {e}")
+            return pd.DataFrame()
+        finally:
+            if conn:
+                conn.close()

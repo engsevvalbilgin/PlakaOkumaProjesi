@@ -204,9 +204,9 @@ def run_streamlit_app():
                 # Araç içerideyse Çıkış Ver butonu
                 if st.button("Çıkış Ver", key=f"exit_{idx}_{plate}"):
                     # Veritabanını aç
-                    db_path = os.environ.get('DB_NAME', 'vehicles.db')
+                    db_path = os.environ['DB_NAME']
                     db = PlateDatabase(db_path)
-                    db.set_exit_time(selected_plate)  # artık self doğru şekilde geliyor
+                    db.set_exit_time_by_id(latest['id'])  # artık self doğru şekilde geliyor
                     st.success(f"{selected_plate} için çıkış verildi!")
 
             st.markdown("---")
