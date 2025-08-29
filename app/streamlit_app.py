@@ -9,18 +9,21 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../src"))
 from plate_database import PlateDatabase
 import cv2
 import time
+from cryptography.fernet import Fernet
 load_dotenv()
+
+# Anahtar .env’den alınmalı
+FERNET_KEY = os.getenv("FERNET_KEY").encode()
+cipher = Fernet(FERNET_KEY)
+
 def get_vehicles_data_from_db():
     conn = None
     try:
-        # Veritabanı dosyasının varlığını kontrol et
-        # Check if the database file exists
         db_exists = os.path.exists(os.environ['DB_NAME'])
         conn = sqlite3.connect(os.environ['DB_NAME'])
         cursor = conn.cursor()
 
-        # vehicles tablosunu oluştur (eğer yoksa)
-        # Create the vehicles table (if it doesn't exist)
+        # Tabloyu oluştur
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS vehicles (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,23 +35,28 @@ def get_vehicles_data_from_db():
         ''')
         conn.commit()
 
-        # Tabloya örnek veri ekle (sadece ilk çalıştırmada)
-        # Add sample data to the table (only on the first run)
-
-
-
-
-        # Tüm veriyi çek ve DataFrame olarak oku
-        # Fetch all data and read as a DataFrame
+        # Veriyi çek
         df = pd.read_sql_query("SELECT * FROM vehicles", conn)
 
-        # Zaman sütunlarını datetime formatına çevir
-        # Convert time columns to datetime format
+        # Plakaları deşifrele
+        def decrypt_plate(encrypted_plate):
+            try:
+                # Eğer veri bytes değilse str'e encode et
+                if isinstance(encrypted_plate, str):
+                    encrypted_plate = encrypted_plate.encode()
+                return cipher.decrypt(encrypted_plate).decode()
+            except Exception:
+                return encrypted_plate.decode() if isinstance(encrypted_plate, bytes) else encrypted_plate
+
+        df['plate'] = df['plate'].apply(decrypt_plate)
+
+        # Zaman sütunları
         df['entry_time'] = pd.to_datetime(df['entry_time'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
         df['exit_time'] = pd.to_datetime(df['exit_time'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
-        # string formatına çevir
+
         df['entry_time_str'] = df['entry_time'].dt.strftime('%Y-%m-%d %H:%M')
         df['exit_time_str'] = df['exit_time'].dt.strftime('%Y-%m-%d %H:%M')
+
         return df
 
     except sqlite3.Error as e:
@@ -57,6 +65,8 @@ def get_vehicles_data_from_db():
     finally:
         if conn:
             conn.close()
+
+
 
 
 # Ana Streamlit uygulama fonksiyonu / Main Streamlit app function
@@ -149,7 +159,7 @@ def run_streamlit_app():
                                                    </div>
                                                """, unsafe_allow_html=True)
                     with col2:
-                        st.markdown(f"**{model}**")
+
                         st.write(f"Giriş: {fmt(entry)}")
                         if pd.notnull(exit_t):
                             st.write(f"Çıkış: {fmt(exit_t)}")
@@ -167,27 +177,7 @@ def run_streamlit_app():
                         if st.button("Detayları Göster", key=btn_key_detay):
                             st.session_state["selected_plate"] = plate
 
-                        # Modeli düzenleme butonu
-                        # Modeli düzenleme butonu
-                        if st.button("Düzenle", key=btn_key_duzenle):
-                            # Kullanıcıdan yeni model bilgisini al
 
-                            new_model = st.text_input(f"{plate} için yeni model girin:", value=model,
-                                                      key=f"input_model_{idx}_{plate}")
-                            new_plate = st.text_input(f"{plate} için yeni plaka girin:", value=plate,
-                                                      key=f"input_plate_{idx}_{plate}")
-
-                            if st.button("Kaydet", key=f"save_{idx}_{plate}"):
-                                old_plate = plate.strip().upper()
-                                new_plate_clean = new_plate.strip().upper()
-                                new_model_clean = new_model.strip()
-
-                                if old_plate != new_plate_clean:
-                                    PlateDatabase.update_plate(old_plate, new_plate_clean)
-                                    st.success(f"{old_plate} → {new_plate_clean} güncellendi!")
-
-                                PlateDatabase.update_model(new_plate_clean, new_model_clean)
-                                st.success(f"{new_plate_clean} için model güncellendi!")
 
     with right_col:
         st.markdown("### Seçilen Araç Detayları")
@@ -200,7 +190,7 @@ def run_streamlit_app():
             # Son kayıt detayları
             latest = plate_history.iloc[0]
 
-            st.markdown(f"#### {latest['plate']} — {latest['model']}")
+            st.markdown(f"#### {latest['plate']}")
             st.write(f"**Giriş:** {fmt(latest['entry_time'])}")
             st.write(f"**Çıkış:** {fmt(latest['exit_time'])}")
 
