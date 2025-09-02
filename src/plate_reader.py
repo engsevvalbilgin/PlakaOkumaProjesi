@@ -14,7 +14,7 @@ class PlateReader:
         gray = cv2.bilateralFilter(gray, 11, 17, 17)
         thresh = cv2.adaptiveThreshold(gray, 255,
                                        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                       cv2.THRESH_BINARY, 11, 2)
+                                       cv2.THRESH_BINARY_INV, 11, 2)
 
         config = "--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         text = pytesseract.image_to_string(thresh, config=config, lang="eng")

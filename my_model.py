@@ -2,7 +2,8 @@ import os
 import random
 import shutil
 from ultralytics import YOLO
-
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # Dataset klasörleri
 '''
@@ -40,8 +41,39 @@ model.train(
 )
 '''
 # Eğitilen modeli test et
+'''
+model = YOLO("C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\runs\\plate_detection\\weights\\best.pt")
+data_path = "C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\plaka_data.yaml"
+metrics = model.val(data=data_path, plots=True, save=True)
+print(metrics)'''
+# Veriyi oku
+'''results_path = 'C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\runs\\plate_detection\\results.csv'
+ # Kendi dosya yolunu yazmalısın
+results = pd.read_csv(results_path)
 
-model = YOLO(r"C:\Users\hp\PycharmProjects\PlakaOkumaProjesi\runs\plate_detection\weights\best.pt")
+# Grafik çizimi
+plt.figure(figsize=(10, 6))
+plt.plot(results['epoch'], results['train/box_loss'], label='Train Kaybı')
+plt.plot(results['epoch'], results['val/box_loss'], label='Validation Kaybı')
 
-metrics = model.val()
-print(metrics)
+plt.title('Eğitim ve Doğrulama Kaybı Grafiği')
+plt.xlabel('Epoch')
+plt.ylabel('Kayıp (Loss)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Grafik çizimi
+plt.figure(figsize=(10, 6))
+plt.plot(results['epoch'], results['metrics/mAP50(B)'], label='Eğitim mAP@0.50')
+plt.plot(results['epoch'], results['metrics/mAP50-95(B)'], label='Doğrulama mAP@0.50-0.95')
+
+
+plt.title('Eğitim ve Doğrulama mAP Grafiği')
+plt.xlabel('Epoch')
+plt.ylabel('mAP Değeri')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+'''

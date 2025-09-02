@@ -91,7 +91,7 @@ def run_streamlit_app():
     mode = st.sidebar.radio("Görüntüleme modu:", ("İçerdeki Araçlar", "Tüm Geçmiş"))
 
     min_date = (datetime.now() - timedelta(days=30)).date()
-    date_range = st.sidebar.date_input("Gün seç (veya aralık)", value=(min_date, datetime.now().date()))
+    date_range = st.sidebar.date_input("Tarih aralığı seçiniz", value=(min_date, datetime.now().date()))
 
     # Eğer tek tarih seçildiyse tuple yap
 
@@ -100,7 +100,7 @@ def run_streamlit_app():
     else:
         start_date = end_date = date_range
 
-    plate_search = st.sidebar.text_input("Plaka ara (opsiyonel)")
+    plate_search = st.sidebar.text_input("Plaka no'ya göre arama (opsiyonel)")
 
     # DataFrame'e filtreleri uygula / Apply filters to the DataFrame
     filtered = df.copy()
@@ -181,6 +181,7 @@ def run_streamlit_app():
 
     with right_col:
         st.markdown("### Seçilen Araç Detayları")
+
         selected_plate = st.session_state.get("selected_plate", None)
         if selected_plate is None:
             st.write("Listeden bir araç seçmek için 'Detayları Göster' butonuna basın. 👈")
@@ -230,15 +231,16 @@ def run_streamlit_app():
         csv_df = df[df["exit_time"].isnull()]  # içerideki araçlar
     else:
         csv_df = filtered.copy()  # filtre varsa filtrelenmiş veriyi al
-
+    if not csv_df.empty:
     # Tarih ve plaka filtrelerini uygula
-    if start_date and end_date:
-        start_datetime = pd.to_datetime(start_date)
-        end_datetime = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-        csv_df = csv_df[
-            (csv_df["entry_time"] >= start_datetime) &
-            (csv_df["entry_time"] <= end_datetime)
-            ]
+        if start_date and end_date:
+            start_datetime = pd.to_datetime(start_date)
+            end_datetime = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+            csv_df = csv_df[
+                (csv_df["entry_time"] >= start_datetime) &
+                (csv_df["entry_time"] <= end_datetime)
+                ]
+
     if plate_search:
         csv_df = csv_df[csv_df["plate"].str.contains(plate_search, case=False, na=False)]
 
