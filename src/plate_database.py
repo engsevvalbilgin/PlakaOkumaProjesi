@@ -43,6 +43,69 @@ class PlateDatabase:
             return encrypted_plate
 
     def record_plate_event(self, plate: str):
+        now = datetime.now()
+        encrypted_plate = self.encrypt_plate(plate)
+
+        # Aktif kayıtları al ve deşifre et
+        self.cursor.execute("SELECT id, plate, entry_time, exit_time FROM vehicles ORDER BY id DESC")
+        all_records = self.cursor.fetchall()
+
+        # 1. Araç çıkışıyla yeni kayıt arasında 3 saniye kuralı
+        if all_records:
+            last_id, last_plate_enc, last_entry_time, last_exit_time = all_records[0]
+            try:
+                last_entry_dt = datetime.strptime(last_entry_time, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                last_entry_dt = datetime.strptime(last_entry_time, "%Y-%m-%d %H:%M:%S")
+            if last_exit_time:
+                try:
+                    last_exit_dt = datetime.strptime(last_exit_time, "%Y-%m-%d %H:%M:%S.%f")
+                except ValueError:
+                    last_exit_dt = datetime.strptime(last_exit_time, "%Y-%m-%d %H:%M:%S")
+                if (now - last_exit_dt).total_seconds() < 3:
+                    return  # 3 sn geçmeden yeni kayıt yapılmaz
+
+        # Aynı plaka içeride mi kontrol et
+        self.cursor.execute("SELECT id, plate, entry_time, exit_time FROM vehicles WHERE exit_time IS NULL")
+        active_records = self.cursor.fetchall()
+        for record in active_records:
+            record_id, enc_plate, entry_time, exit_time = record
+            try:
+                entry_time_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                entry_time_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+
+            if exit_time is None:
+                # 2. Giriş-çıkış arasında minimum 3 saniye
+                if (now - entry_time_dt).total_seconds() < 3:
+                    return
+                else:
+                    # 3 sn geçtiyse çıkış ver
+                    self.cursor.execute(
+                        "UPDATE vehicles SET exit_time = ? WHERE id = ?",
+                        (now, record_id)
+                    )
+                    self.conn.commit()
+                return
+
+        # 3. Farklı araçların girişleri arasında 3 saniye kuralı
+        for record in all_records:
+            record_id, enc_plate, entry_time, exit_time = record
+            try:
+                entry_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                entry_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+            if (now - entry_dt).total_seconds() < 3:
+                return  # 3 sn geçmeden başka araç kaydı yapılmaz
+
+        # Yeni giriş kaydı oluştur
+        self.cursor.execute(
+            "INSERT INTO vehicles (plate, entry_time) VALUES (?, ?)",
+            (encrypted_plate, now)
+        )
+        self.conn.commit()
+
+    '''def record_plate_event(self, plate: str):
         """
         Araç giriş/çıkış kaydı yapar.
         Aynı plaka ard arda kaydedilmez, şifrelenmiş olsa da deşifre ederek kontrol eder.
@@ -77,6 +140,7 @@ class PlateDatabase:
                 return
 
         # Yoksa yeni giriş kaydı oluştur
+
         self.cursor.execute(
             "INSERT INTO vehicles (plate, entry_time) VALUES (?, ?)",
             (encrypted_plate, now)
@@ -84,24 +148,25 @@ class PlateDatabase:
 
         self.conn.commit()
 
+'''
     def set_exit_time_by_id(self, vehicle_id: int):
-        print(vehicle_id)
+        '''print(vehicle_id)'''
         vehicle_id = int(vehicle_id)
         now = datetime.now()
         self.cursor.execute("SELECT id, plate, exit_time FROM vehicles WHERE id=?", (vehicle_id,))
         rows = self.cursor.fetchall()
-        print("Veritabanında bu ID ile kayıt:", rows)
+        '''print("Veritabanında bu ID ile kayıt:", rows)'''
         self.cursor.execute(
             "UPDATE vehicles SET exit_time = ? WHERE id = ?",
             (now, vehicle_id)
         )
-        print("Güncellenen satır sayısı:", self.cursor.rowcount)
+        '''print("Güncellenen satır sayısı:", self.cursor.rowcount)'''
         self.conn.commit()
 
     def set_exit_time(self, plate: str):
         print(plate)
         encrypted_plate = self.encrypt_plate(plate)
-        print(encrypted_plate)
+        '''print(encrypted_plate)'''
         now = datetime.now()
         self.cursor.execute(
             "UPDATE vehicles SET exit_time = ? WHERE plate = ? AND exit_time IS NULL",

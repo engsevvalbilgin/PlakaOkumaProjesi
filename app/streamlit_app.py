@@ -5,11 +5,12 @@ import sqlite3
 import os
 from dotenv import load_dotenv
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "../src"))
-from plate_database import PlateDatabase
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from src.plate_database import PlateDatabase
 import cv2
 import time
 from cryptography.fernet import Fernet
+from src.capture import start_capture
 load_dotenv()
 
 # Anahtar .env’den alınmalı
