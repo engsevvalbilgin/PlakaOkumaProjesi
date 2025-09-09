@@ -36,6 +36,7 @@ class PlateReader:
 
 
 
+'''
 import cv2
 import Levenshtein
 
@@ -89,4 +90,4 @@ for pred, true in zip(predicted_plates, true_plates):
     total_score += score
 
 average_score = total_score / len(true_plates)
-print(f"Ortalama karakter doğruluğu: {average_score*100:.2f}%")
+print(f"Ortalama karakter doğruluğu: {average_score*100:.2f}%")'''

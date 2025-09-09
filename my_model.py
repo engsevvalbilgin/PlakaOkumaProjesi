@@ -47,7 +47,8 @@ data_path = "C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\plaka_data.yaml"
 metrics = model.val(data=data_path, plots=True, save=True)
 print(metrics)'''
 # Veriyi oku
-'''results_path = 'C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\runs\\plate_detection\\results.csv'
+'''
+results_path = 'C:\\Users\\hp\\PycharmProjects\\PlakaOkumaProjesi\\runs\\plate_detection\\results.csv'
  # Kendi dosya yolunu yazmalısın
 results = pd.read_csv(results_path)
 
@@ -75,5 +76,4 @@ plt.ylabel('mAP Değeri')
 plt.legend()
 plt.grid(True)
 plt.show()
-
 '''

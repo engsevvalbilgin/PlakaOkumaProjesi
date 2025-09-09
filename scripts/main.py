@@ -2,6 +2,7 @@ def main():
     print("Plaka Tespit Sistemi")
     print("1: Bilgisayar Kamerası")
     print("2: Telefon Kamerası (IP Stream)")
+    from ultralytics import YOLO
 
     choice = input("Seçiminizi yapın (1 veya 2): ")
 
