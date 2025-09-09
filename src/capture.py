@@ -7,15 +7,22 @@ from src.plate_database import PlateDatabase
 load_dotenv()
 
 
-def start_capture():
+def start_capture(device=None):
 
     db_path = os.path.join(os.environ['data_path'], 'vehicles.db')
     plate_db = PlateDatabase(db_path)
 
     model_path = os.environ['model_path']
     plate_detector = Detector(model_path)
+    if device is None:
+        webcam = cv2.VideoCapture(0)
+    else:
+        webcam = cv2.VideoCapture(device)
 
-    webcam = cv2.VideoCapture(0)
+
+        if not webcam.isOpened():
+            print("Kamera açılamadı!")
+            exit()
 
     while True:
         ret, frame = webcam.read()
