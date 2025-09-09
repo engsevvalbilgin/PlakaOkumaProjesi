@@ -101,9 +101,6 @@ Eğitim sonrası model performans metrikleri `runs/plate_detection` dizininde ka
 - Recall
 - F1-Score
 
-## 📄 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için `LICENSE` dosyasına bakınız.
 
 ## 📞 İletişim
 
